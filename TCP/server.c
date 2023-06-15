@@ -1,16 +1,19 @@
+// Concurrent calculator TCP
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <pthread.h>
 
 // Define server port and buffer size
 #define SERVER_PORT 8080
 #define BUFFER_SIZE 1024
 
 // Function to handle client requests
-void handle_client(int sockfd) {
+void* handle_client(void* arg) {
+    int sockfd = *(int*)arg;
     char buffer[BUFFER_SIZE];
     int num1, num2, result;
     char operator;
@@ -19,36 +22,50 @@ void handle_client(int sockfd) {
     read(sockfd, buffer, BUFFER_SIZE);
     sscanf(buffer, "%d %c %d", &num1, &operator, &num2);
 
+    printf("Received request from client: %d %c %d\n", num1, operator, num2);
+
     // Perform the requested operation based on the operator
     switch (operator) {
         case '+':
             result = num1 + num2;
+            printf("Performing addition: %d + %d = %d\n", num1, num2, result);
             break;
         case '-':
             result = num1 - num2;
+            printf("Performing subtraction: %d - %d = %d\n", num1, num2, result);
             break;
         case '*':
             result = num1 * num2;
+            printf("Performing multiplication: %d * %d = %d\n", num1, num2, result);
             break;
         case '/':
             // Check for division by zero and send error message to client
             if (num2 == 0) {
                 strcpy(buffer, "Error: Division by zero");
                 write(sockfd, buffer, strlen(buffer));
-                return;
+                close(sockfd);
+                pthread_exit(NULL);
             }
             result = num1 / num2;
+            printf("Performing division: %d / %d = %d\n", num1, num2, result);
             break;
         default:
             // Send error message for invalid operator to client
             strcpy(buffer, "Error: Invalid operator");
             write(sockfd, buffer, strlen(buffer));
-            return;
+            close(sockfd);
+            pthread_exit(NULL);
     }
 
     // Convert the result to string and send it back to the client
     sprintf(buffer, "%d", result);
     write(sockfd, buffer, strlen(buffer));
+    printf("Sent result to client: %d\n", result);
+
+    // Close the client socket and exit the thread
+    close(sockfd);
+    printf("Closed connection with client\n");
+    pthread_exit(NULL);
 }
 
 // Main function to set up the server and listen for client connections
@@ -71,12 +88,18 @@ int main() {
 
     // Listen for incoming connections
     listen(sockfd, 5);
+    printf("Server started and listening for connections...\n");
 
-    // Accept client connections and handle their requests
+    // Accept client connections and handle their requests concurrently
     while (1) {
         newsockfd = accept(sockfd, (struct sockaddr *)&client_address, &client_address_length);
-        handle_client(newsockfd);
-        close(newsockfd);
+
+        // Create a new thread to handle the client request
+        pthread_t thread;
+        pthread_create(&thread, NULL, handle_client, &newsockfd);
+
+        // Detach the thread to allow it to clean up its resources automatically
+        pthread_detach(thread);
     }
 
     // Close the server socket
