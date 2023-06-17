@@ -35,8 +35,8 @@ int main() {
     struct sockaddr_in server_address;
     socklen_t server_address_length = sizeof(server_address);
 
-    // Create a socket for both TCP and UDP
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    // Create a UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Failed to create socket");
         exit(EXIT_FAILURE);
@@ -47,12 +47,6 @@ int main() {
     server_address.sin_port = htons(SERVER_PORT);
     if (inet_pton(AF_INET, SERVER_IP, &(server_address.sin_addr)) <= 0) {
         perror("Invalid server address");
-        exit(EXIT_FAILURE);
-    }
-
-    // Connect to the server (for TCP)
-    if (connect(sockfd, (struct sockaddr *)&server_address, server_address_length) < 0) {
-        perror("Failed to connect");
         exit(EXIT_FAILURE);
     }
 
